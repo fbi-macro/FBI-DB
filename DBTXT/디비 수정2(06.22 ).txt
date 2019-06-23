@@ -1,0 +1,244 @@
+-- usename : fbi
+-- password : oracle
+select * from userinfo;
+insert into userinfo values('admin','1234','N',null,'1234','KB');
+--#####################################################################################--
+create table userInfo(--사용자 테이블
+userid varchar2(20) primary key,--아이디
+userpass varchar2(20) not null,--비밀번호
+founderYN char(1) constraint found_check check(founderYN in ('Y','N')),--창업자 유무
+myBuilding number(20), -- 창업자가 클라우드 펀딩을 신청하여 건물을 받았을 때
+account varchar2(20), -- 계좌
+bank varchar2(10), -- 은행
+constraint building_fk foreign key(myBuilding) references building(bdId) on delete cascade -- 이부분 생성 바로하면 에러날수도있음 수정해서 넣은부분
+);
+--#####################################################################################--
+create table user_vote( -- 사용자가 투표한 건물들을 체크하기위한 테이블
+user_vote_idx number(3) primary key, --인덱스
+userid varchar2(20), -- userid fk
+vote_build_id number(20), -- bdId
+constraint user_vote_fk foreign key(userid) references userInfo(userid) on delete cascade
+);
+create sequence user_vote_seq Start with 1 increment by 1 maxvalue 1000 nocycle nocache; -- comment에서 사용 할 시퀀스
+--#####################################################################################--
+--alter table userinfo add(myBuilding number(20));
+--alter table userInfo add(constraint building_fk foreign key(myBuilding) references building(bdId) on delete cascade);
+
+--select * from all_constraints where table_name='userinfo';
+--alter table userinfo drop constraint building_fk;
+
+
+--#####################################################################################--
+create table comments(--댓글 테이블
+comm_idx number(7) primary key, --자동으로 증가하는 인덱스
+comm varchar(200) not null,--댓글내용
+userid varchar(20),--사용자
+upnum number(10),--추천
+constraint userid_fk foreign key(userid) references userInfo(userid)--userinfo테이블에서 userid를 받아옴
+);
+--#####################################################################################--
+create table building(--건물정보 테이블
+bdId number(10) primary key,--건물 일련번호
+location_x number(3,14) default 0,--위치 x
+location_y number(3,14) default 0,--위치 y
+starDate date, -- 펀딩중이라면 시작하는날
+endDate date, -- 끝나는날
+address varchar(100) not null,--주소 스트링 받아서 잘라서 사용해야함
+month_pay number(10) default 0,--월세
+all_pay number(10) default 0,--전세
+manage_pay number(10) default 0,--관리비
+userid varchar2(20), -- 펀딩중이라면 해당 유저의 아이디
+category varchar2(20),--펀딩중이라면 가게의 카테고리 혹은 종목
+fundingYN char(1) constraint buld_found_check check(fundingYN in ('Y','N'))--펀딩중인 건물인지 확인하기
+);
+alter table building rename column starDate to startDate;
+desc building;
+--#####################################################################################--
+create table voting(--투표테이블
+vote_idx number(7) primary key, -- vote 인덱스
+bdId number(10), -- 빌딩 아이디 fk
+dessert number(3) default 0,--휴게음식점 (커피,제과)
+restaurant number(3) default 0,--일반 음식점
+store number(3) default 0,--악세사리,편의점,화장품
+enter number(3) default 0,--헬스 스크린골프 pc 노래방
+lodgment number(3) default 0,--숙박
+constraint vote_building_fk foreign key(bdId) references building(bdId) on delete cascade
+);
+--#####################################################################################--
+create table dessert(
+dessert_idx number(10) primary key,
+buildnum number(10),
+coffee number(3) default 0,--커피
+bakery number(3) default 0,--빵집
+icecream number(3) default 0,--아이스크림
+constraint bd_dessert_fk foreign key(buildnum) references building(bdId) on delete cascade
+);
+create sequence dessert_seq Start with 1 increment by 1 maxvalue 10000 nocycle nocache;
+
+--alter table dessert drop column doughnut;
+--도넛 삭제
+select * from dessert;
+
+create or replace trigger dessert_trigger
+after
+update on dessert
+for each row
+begin
+    update voting
+    set dessert = :new.coffee+:new.bakery+:new.icecream
+    where bdId = :old.buildnum;
+end;
+--#####################################################################################--
+create table westernFood(
+restaurant_idx number(10) primary key,
+buildnum number(10),
+krFood number(3) default 0,--한식
+chiFood number(3) default 0,--중식
+japFood number(3) default 0,--일식
+vietFood number(3) default 0,--베트남음식
+snackBar number(3) default 0,--분식점
+restaurant number(3) default 0,--레스토랑
+bar number(3) default 0,--바
+chicken number(3) default 0,--치킨
+beer number(3) default 0,--맥주
+pizza number(3) default 0,--피자
+hamburger number(3) default 0,--햄버거
+meatRest number(3) default 0,--고기집
+nightMeal number(3) default 0,
+constraint bd_restaurant_fk foreign key(buildnum) references building(bdId) on delete cascade
+);
+--alter table restaurant add(nightMeal number(3) default 0);
+--야식 테이블 추가
+--alter table restaurant rename to westernFood;
+--테이블 명 변경
+
+create sequence restaurant_seq Start with 1 increment by 1 maxvalue 10000 nocycle nocache;
+
+create or replace trigger westernFood_trigger
+after
+update on westernFood
+for each row
+begin
+    update voting
+    set store = 
+    :new.krFood+
+:new.chiFood+:new.japFood+
+:new.vietFood+:new.snackBar+:new.restaurant+
+:new.bar+:new.chicken+:new.beer+
+:new.pizza+:new.hamburger+:new.meatRest+:new.nightMeal
+    where bdId = :old.buildnum;
+end;
+--drop trigger restaurant_trigger;
+/*
+create or replace trigger restaurant_trigger
+after
+update on restaurant
+for each row
+begin
+    update voting
+    set store = 
+    :new.krFood+
+:new.chiFood+:new.japFood+
+:new.vietFood+:new.snackBar+:new.restaurant+
+:new.bar+:new.chicken+:new.beer+
+:new.pizza+:new.hamburger+:new.meatRest+:new.nightMeal
+    where bdId = :old.buildnum;
+end;
+drop trigger restaurant_trigger;
+*/
+
+
+
+--#####################################################################################--
+
+create table store(
+store_idx number(10) primary key,
+buildnum number(10),
+accessory number(3) default 0,--악세사리
+convenienStore number(3) default 0,--편의점
+cosmetics number(3) default 0,--화장품
+phone number(3) default 0,--핸드폰 가맹점
+constraint bd_store_fk foreign key(buildnum) references building(bdId) on delete cascade
+);
+create sequence store_seq Start with 1 increment by 1 maxvalue 10000 nocycle nocache;
+
+create or replace trigger store_trigger
+after
+update on store
+for each row
+begin
+    update voting
+    set store = :new.accessory+:new.convenienStore+:new.cosmetics+:new.phone
+    where bdId = :old.buildnum;
+end;
+
+--#####################################################################################--
+create table lodgment(
+lodgment_idx number(10) primary key,
+buildnum number(10),
+hotel number(3) default 0, --호텔
+motel number(3) default 0, --모텔
+constraint bd_lodgment_fk foreign key(buildnum) references building(bdId) on delete cascade
+);
+create sequence lodgment_seq Start with 1 increment by 1 maxvalue 10000 nocycle nocache;
+
+create or replace trigger lodgment_trigger
+after
+update on lodgment
+for each row
+begin
+    update voting
+    set store = :new.hotel+:new.motel
+    where bdId = :old.buildnum;
+end;
+
+--#####################################################################################--
+create table entertaiment(
+entertaiment_idx number(10) primary key,
+buildnum number(10),
+fitness number(3) default 0,--헬스장
+screenGolf number(3) default 0,--스크린 골프
+billiard number(3) default 0,--당구장
+PC number(3) default 0,--피시방
+yoga number(3) default 0,-- 요가
+massage number(3) default 0,--마사지
+nailCare number(3) default 0,--네일샵
+karaoke number(3) default 0,--노래방
+constraint bd_entertaiment_fk foreign key(buildnum) references building(bdId) on delete cascade
+);
+create sequence entertaiment_seq Start with 1 increment by 1 maxvalue 10000 nocycle nocache;
+
+create or replace trigger entertaiment_trigger
+after
+update on entertaiment
+for each row
+begin
+    update voting
+    set store = 
+    :new.fitness+:new.screenGolf+:new.billiard+:new.PC
+    +:new.yoga+:new.massage+:new.nailCare
+    +:new.karaoke
+    where bdId = :old.buildnum;
+end;
+--#####################################################################################--
+
+
+create sequence comm_seq Start with 1 increment by 1 maxvalue 10000 nocycle nocache; -- comment에서 사용 할 시퀀스
+insert into comments values(comm_seq.nextval,'테스트','admin',100);--삽입할때 comm_seq.nextval꼭 사용해야함
+
+create sequence vote_seq Start with 1 increment by 1 maxvalue 1000 nocycle nocache;--vote에서 사용 할 시퀀스
+insert into voting values(vote_seq.nextval,111,0,0,0,0,0); -- 삽입할때 vote_seq.nextval 사용해야함
+
+select * from userInfo;--유저정보
+select * from comments;--댓글정보
+select * from building;--건물정보
+select * from voting;--투표정보
+--투표상세 테이블--
+select * from dessert;
+select * from restaurant;
+select * from store;
+select * from enter;
+select * from lodgment;
+
+commit;
+
